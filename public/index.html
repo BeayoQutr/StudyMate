@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StudyMate - 个人学习任务看板</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -119,6 +122,17 @@
         <p>Made with ❤️ by <strong>岁年</strong> &nbsp;|&nbsp; StudyMate © 2026</p>
     </footer>
 
+    <script>
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("/service-worker.js", { scope: "/" })
+                .then(function (reg) {
+                    console.log("[SW] 注册成功, scope:", reg.scope);
+                })
+                .catch(function (err) {
+                    console.error("[SW] 注册失败:", err);
+                });
+        }
+    </script>
     <script src="app.js"></script>
 </body>
 </html>
