@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "migrate:tasks": "node scripts/migrate-tasks-to-db.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
