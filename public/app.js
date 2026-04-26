@@ -53,6 +53,9 @@ async function apiFetch(url, options) {
 /** 当前任务列表（内存中，从后端加载） */
 let tasks = [];
 
+/** 当前正在编辑的任务 ID，null 表示非编辑状态 */
+let editingTaskId = null;
+
 // ==================== DOM 元素引用 ====================
 
 const taskInput = document.getElementById("taskInput");
@@ -105,6 +108,23 @@ function formatDateForDisplay(isoStr) {
     const hours = String(date.getHours()).padStart(2, "0");
     const minutes = String(date.getMinutes()).padStart(2, "0");
     return year + "/" + month + "/" + day + " " + hours + ":" + minutes;
+}
+
+/**
+ * 将 ISO 日期字符串转换为 datetime-local 输入框格式（本地时间）
+ * @param {string|null} isoStr
+ * @returns {string} 例如 "2026-05-12T13:00"，空值返回 ""
+ */
+function ISOToDatetimeLocal(isoStr) {
+    if (!isoStr) return "";
+    var date = new Date(isoStr);
+    if (isNaN(date.getTime())) return "";
+    var year = date.getFullYear();
+    var month = String(date.getMonth() + 1).padStart(2, "0");
+    var day = String(date.getDate()).padStart(2, "0");
+    var hours = String(date.getHours()).padStart(2, "0");
+    var minutes = String(date.getMinutes()).padStart(2, "0");
+    return year + "-" + month + "-" + day + "T" + hours + ":" + minutes;
 }
 
 /**
@@ -400,52 +420,233 @@ function renderTaskList() {
     filtered.forEach(function (task) {
         var li = document.createElement("li");
         li.className = "task-item";
-
-        // 优先级信息
-        var prioInfo = getPriorityInfo(task.priority);
-
-        // 设置 data-priority 属性，让 CSS 左侧色条生效
         li.setAttribute("data-priority", task.priority);
 
-        // 构建 HTML 内容
-        li.innerHTML =
-            '<input type="checkbox" class="task-checkbox" ' +
-            (task.completed ? "checked" : "") +
-            ' data-id="' +
-            task.id +
-            '">' +
-            '<span class="task-badge ' +
-            prioInfo.badgeClass +
-            '">' +
-            prioInfo.label +
-            "</span>" +
-            '<span class="task-category">' +
-            escapeHtml(task.category) +
-            "</span>" +
-            '<span class="task-text' +
-            (task.completed ? " done" : "") +
-            '">' +
-            escapeHtml(task.text) +
-            "</span>" +
-            '<button class="task-delete" data-id="' +
-            task.id +
-            '" title="删除任务">✕</button>' +
-            buildDateInfoHtml(task);
+        if (task.id === editingTaskId) {
+            // ========== 编辑模式 ==========
+            li.classList.add("task-edit-item");
+            li.innerHTML = buildEditFormHtml(task);
+            bindEditFormEvents(li, task);
+        } else {
+            // ========== 正常显示模式 ==========
+            var prioInfo = getPriorityInfo(task.priority);
 
-        // 绑定复选框事件
-        var checkbox = li.querySelector(".task-checkbox");
-        checkbox.addEventListener("change", function () {
-            toggleDone(this.getAttribute("data-id"));
-        });
+            // 构建 HTML 内容
+            li.innerHTML =
+                '<input type="checkbox" class="task-checkbox" ' +
+                (task.completed ? "checked" : "") +
+                ' data-id="' +
+                task.id +
+                '">' +
+                '<span class="task-badge ' +
+                prioInfo.badgeClass +
+                '">' +
+                prioInfo.label +
+                "</span>" +
+                '<span class="task-category">' +
+                escapeHtml(task.category) +
+                "</span>" +
+                '<span class="task-text' +
+                (task.completed ? " done" : "") +
+                '">' +
+                escapeHtml(task.text) +
+                "</span>" +
+                '<button class="task-edit-btn" data-id="' +
+                task.id +
+                '" title="编辑任务">✎</button>' +
+                '<button class="task-delete" data-id="' +
+                task.id +
+                '" title="删除任务">✕</button>' +
+                buildDateInfoHtml(task);
 
-        // 绑定删除按钮事件
-        var deleteBtn = li.querySelector(".task-delete");
-        deleteBtn.addEventListener("click", function () {
-            deleteTask(this.getAttribute("data-id"));
-        });
+            // 绑定复选框事件
+            var checkbox = li.querySelector(".task-checkbox");
+            checkbox.addEventListener("change", function () {
+                toggleDone(this.getAttribute("data-id"));
+            });
+
+            // 绑定删除按钮事件
+            var deleteBtn = li.querySelector(".task-delete");
+            deleteBtn.addEventListener("click", function () {
+                deleteTask(this.getAttribute("data-id"));
+            });
+
+            // 绑定编辑按钮事件
+            var editBtn = li.querySelector(".task-edit-btn");
+            editBtn.addEventListener("click", function () {
+                startEditTask(this.getAttribute("data-id"));
+            });
+        }
 
         taskListEl.appendChild(li);
     });
+}
+
+// ==================== 编辑任务功能 ====================
+
+/**
+ * 进入编辑状态
+ * @param {string} id - 任务 ID
+ */
+function startEditTask(id) {
+    editingTaskId = id;
+    renderTaskList();
+}
+
+/**
+ * 取消编辑，恢复原任务显示
+ */
+function cancelEdit() {
+    editingTaskId = null;
+    renderTaskList();
+}
+
+/**
+ * 构建编辑表单 HTML
+ * @param {Object} task
+ * @returns {string}
+ */
+function buildEditFormHtml(task) {
+    var priorityOptions = [
+        { value: "low", label: "🟢 低优先级" },
+        { value: "medium", label: "🟡 中优先级" },
+        { value: "high", label: "🔴 高优先级" }
+    ];
+    var categoryOptions = ["学习", "作业", "考试", "项目", "其他"];
+
+    var priorityOptsHtml = priorityOptions.map(function (opt) {
+        var sel = task.priority === opt.value ? " selected" : "";
+        return '<option value="' + opt.value + '"' + sel + '>' + escapeHtml(opt.label) + "</option>";
+    }).join("");
+
+    var categoryOptsHtml = categoryOptions.map(function (cat) {
+        var sel = task.category === cat ? " selected" : "";
+        return '<option value="' + cat + '"' + sel + '>' + escapeHtml(cat) + "</option>";
+    }).join("");
+
+    var startAtLocal = ISOToDatetimeLocal(task.startAt);
+    var dueAtLocal = ISOToDatetimeLocal(task.dueAt);
+
+    return (
+        '<div class="task-edit-form">' +
+        '<input type="text" class="task-edit-input" value="' +
+        escapeHtml(task.text) +
+        '" maxlength="60" placeholder="任务内容" autocomplete="off">' +
+        '<select class="form-select form-select--sm task-edit-priority">' +
+        priorityOptsHtml +
+        "</select>" +
+        '<select class="form-select form-select--sm task-edit-category">' +
+        categoryOptsHtml +
+        "</select>" +
+        '<input type="datetime-local" class="datetime-input task-edit-startat" value="' +
+        startAtLocal +
+        '" title="开始时间">' +
+        '<input type="datetime-local" class="datetime-input task-edit-dueat" value="' +
+        dueAtLocal +
+        '" title="截止时间">' +
+        '<div class="task-edit-actions">' +
+        '<button class="btn btn-primary task-edit-save">💾 保存</button>' +
+        '<button class="btn task-edit-cancel">取消</button>' +
+        "</div>" +
+        "</div>"
+    );
+}
+
+/**
+ * 绑定编辑表单的事件（保存/取消）
+ * @param {HTMLElement} li - 任务项 li 元素
+ * @param {Object} task - 任务对象
+ */
+function bindEditFormEvents(li, task) {
+    var saveBtn = li.querySelector(".task-edit-save");
+    var cancelBtn = li.querySelector(".task-edit-cancel");
+    var textInput = li.querySelector(".task-edit-input");
+
+    saveBtn.addEventListener("click", function () {
+        saveEdit(task.id, li);
+    });
+
+    cancelBtn.addEventListener("click", function () {
+        cancelEdit();
+    });
+
+    // 在文本输入框中按回车保存
+    textInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            saveEdit(task.id, li);
+        }
+    });
+
+    // 自动聚焦文本输入框
+    textInput.focus();
+    // 将光标移到文本末尾
+    var len = textInput.value.length;
+    textInput.setSelectionRange(len, len);
+}
+
+/**
+ * 保存编辑（调用 PATCH /api/tasks/:id）
+ * @param {string} id - 任务 ID
+ * @param {HTMLElement} li - 任务项 li 元素
+ */
+async function saveEdit(id, li) {
+    var textInput = li.querySelector(".task-edit-input");
+    var prioritySelect = li.querySelector(".task-edit-priority");
+    var categorySelect = li.querySelector(".task-edit-category");
+    var startAtInput = li.querySelector(".task-edit-startat");
+    var dueAtInput = li.querySelector(".task-edit-dueat");
+
+    var text = textInput.value.trim();
+
+    // 校验：内容不能为空
+    if (!text) {
+        textInput.classList.add("error");
+        textInput.focus();
+        setTimeout(function () {
+            textInput.classList.remove("error");
+        }, 1500);
+        return;
+    }
+
+    var priority = prioritySelect.value;
+    var category = categorySelect.value;
+    var startAtISO = datetimeLocalToISO(startAtInput.value);
+    var dueAtISO = datetimeLocalToISO(dueAtInput.value);
+
+    // 校验：startAt 不能晚于 dueAt
+    if (startAtISO && dueAtISO && startAtISO > dueAtISO) {
+        alert("开始时间不能晚于截止时间");
+        return;
+    }
+
+    var body = {
+        text: text,
+        priority: priority,
+        category: category,
+        startAt: startAtISO,
+        dueAt: dueAtISO
+    };
+
+    try {
+        var json = await apiFetch("/api/tasks/" + id, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+        // 用后端返回的数据更新本地任务
+        tasks = tasks.map(function (t) {
+            return t.id === id ? json.data : t;
+        });
+    } catch (e) {
+        console.error("❌ 更新任务失败:", e.message);
+        alert("更新任务失败：" + e.message);
+        return;
+    }
+
+    // 退出编辑状态并刷新
+    editingTaskId = null;
+    refresh();
 }
 
 /**

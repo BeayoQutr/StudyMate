@@ -564,6 +564,31 @@ body {
     text-decoration-thickness: 2px;
 }
 
+/* 编辑按钮 */
+.task-edit-btn {
+    width: 34px;
+    height: 34px;
+    border: none;
+    background: transparent;
+    color: #c8cfd8;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+    font-weight: 400;
+    order: 98;
+}
+
+.task-edit-btn:hover {
+    color: var(--color-primary);
+    background-color: #eef0ff;
+    transform: scale(1.1);
+}
+
 /* 删除按钮 */
 .task-delete {
     width: 34px;
@@ -633,6 +658,96 @@ body {
 .task-date.date-hint-future {
     color: var(--color-primary);
     font-weight: 500;
+}
+
+/* ==================== 编辑表单 ==================== */
+.task-edit-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    width: 100%;
+    align-items: center;
+    padding: 4px 0;
+}
+
+.task-edit-input {
+    flex: 1;
+    min-width: 200px;
+    padding: 11px 14px;
+    font-size: 15px;
+    border: 2px solid var(--color-primary);
+    border-radius: var(--radius-xs);
+    outline: none;
+    font-family: var(--font-family);
+    background: #fff;
+    box-shadow: 0 0 0 4px var(--color-primary-glow);
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.task-edit-input.error {
+    border-color: var(--color-high);
+    box-shadow: 0 0 0 4px rgba(229, 81, 78, 0.08);
+}
+
+.task-edit-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.task-edit-cancel {
+    padding: 11px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    background: #fff;
+    color: var(--color-text-light);
+    font-family: var(--font-family);
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.task-edit-cancel:hover {
+    background: var(--color-bg);
+    color: var(--color-text);
+    border-color: #c8cfd8;
+}
+
+.task-edit-item {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-glow);
+    background: #fafbff;
+}
+
+.task-edit-item:hover {
+    transform: none;
+    background: #fafbff;
+    border-color: var(--color-primary);
+}
+
+/* 移动端编辑表单适配 */
+@media (max-width: 600px) {
+    .task-edit-form {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .task-edit-input {
+        width: 100%;
+        min-width: 100%;
+    }
+
+    .task-edit-actions {
+        width: 100%;
+    }
+
+    .task-edit-actions .btn,
+    .task-edit-actions .task-edit-cancel {
+        flex: 1;
+        text-align: center;
+    }
 }
 
 /* ==================== 底部 ==================== */
@@ -779,6 +894,10 @@ body {
 
     .task-delete {
         margin-left: auto;
+    }
+
+    .task-edit-btn {
+        order: 97;
     }
 
     .header-inner {
