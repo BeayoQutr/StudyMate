@@ -330,33 +330,33 @@ function getPriorityInfo(priority) {
 function buildDateInfoHtml(task) {
     var now = new Date();
     var parts = [];
-    var startDisplay = formatDateForDisplay(task.startAt);
-    var dueDisplay = formatDateForDisplay(task.dueAt);
 
-    if (startDisplay) {
-        var cls = "";
-        // 未开始提示：startAt 在未来且未完成
-        if (!task.completed && task.startAt && new Date(task.startAt) > now) {
-            cls = ' class="date-hint-future"';
+    // 开始时间
+    if (task.startAt) {
+        var startDisplay = formatDateForDisplay(task.startAt);
+        if (startDisplay) {
+            var isFuture = !task.completed && new Date(task.startAt) > now;
+            var startCls = "task-date" + (isFuture ? " date-hint-future" : "");
+            parts.push('<span class="' + startCls + '">开始：' + escapeHtml(startDisplay));
+            if (isFuture) {
+                parts.push(' <span class="date-hint-badge date-hint-future">未开始</span>');
+            }
+            parts.push("</span>");
         }
-        parts.push('<span class="task-date"' + cls + '>开始：' + escapeHtml(startDisplay) + "");
-        if (!task.completed && task.startAt && new Date(task.startAt) > now) {
-            parts.push(' <span class="date-hint-badge date-hint-future">未开始</span>');
-        }
-        parts.push("</span>");
     }
 
-    if (dueDisplay) {
-        var cls2 = "";
-        // 已过期提示：dueAt 已过且未完成
-        if (!task.completed && task.dueAt && new Date(task.dueAt) < now) {
-            cls2 = ' class="date-hint-overdue"';
+    // 截止时间
+    if (task.dueAt) {
+        var dueDisplay = formatDateForDisplay(task.dueAt);
+        if (dueDisplay) {
+            var isOverdue = !task.completed && new Date(task.dueAt) < now;
+            var dueCls = "task-date" + (isOverdue ? " date-hint-overdue" : "");
+            parts.push('<span class="' + dueCls + '">截止：' + escapeHtml(dueDisplay));
+            if (isOverdue) {
+                parts.push(' <span class="date-hint-badge date-hint-overdue">已过期</span>');
+            }
+            parts.push("</span>");
         }
-        parts.push('<span class="task-date"' + cls2 + '>截止：' + escapeHtml(dueDisplay) + "");
-        if (!task.completed && task.dueAt && new Date(task.dueAt) < now) {
-            parts.push(' <span class="date-hint-badge date-hint-overdue">已过期</span>');
-        }
-        parts.push("</span>");
     }
 
     if (parts.length > 0) {
