@@ -1,6 +1,6 @@
 # StudyMate — 个人学习任务看板
 
-一个简洁美观的学习任务管理工具，支持添加、查看、编辑、标记完成、删除和清空任务。前后端分离，数据持久化存储，已部署到 Render 线上服务。
+一个简洁美观的个人学习任务管理工具，支持添加、编辑、删除、标记完成和清空任务。带单用户登录保护，前后端分离，数据持久化存储，已部署到 Render 线上服务。
 
 线上地址：https://studymate-eiyw.onrender.com
 GitHub 仓库：https://github.com/Beayoqutr/StudyMate
@@ -12,6 +12,7 @@ GitHub 仓库：https://github.com/Beayoqutr/StudyMate
 | 功能 | 说明 |
 |------|------|
 | ➕ 添加任务 | 输入任务内容（text），选择优先级和分类，可选设置开始/截止时间 |
+| ✏️ 编辑任务 | 点击任务卡片上的编辑按钮，直接修改任务内容、优先级、分类和日期 |
 | ✅ 标记完成 | 点击复选框切换任务的完成/未完成状态 |
 | 🗑 删除任务 | 每个任务都有独立的删除按钮 |
 | 🔴🟡🟢 优先级 | 高／中／低三档，用不同颜色徽章区分 |
@@ -22,7 +23,7 @@ GitHub 仓库：https://github.com/Beayoqutr/StudyMate
 | 🧹 清空已完成 | 一键清除所有已完成任务（带确认弹窗） |
 | 💾 数据持久化 | 任务保存到 `data/tasks.json`，重启服务不丢失 |
 | 📱 响应式设计 | 在手机和平板上也能正常使用 |
-| 🔐 单用户登录 | 基于 Cookie 的密码保护，httpOnly + 签名防篡改 |
+| 🔐 单用户登录 | 基于 Cookie 的密码保护，httpOnly + HMAC-SHA256 签名防篡改 |
 | 📲 PWA 支持 | manifest 和图标已配置，可安装到桌面（service worker 当前未启用） |
 
 ---
@@ -30,7 +31,7 @@ GitHub 仓库：https://github.com/Beayoqutr/StudyMate
 ## 🛠 技术栈
 
 - **前端**：HTML5 + CSS3（Flexbox / Grid / CSS 变量）+ 原生 JavaScript（fetch API）
-- **后端**：Node.js + Express
+- **后端**：Node.js + Express + REST API
 - **存储**：JSON 文件（`data/tasks.json`）
 - **部署**：Render Web Service
 - **认证**：HMAC-SHA256 签名 Cookie
@@ -183,6 +184,7 @@ npm start
 
 - 只传需要修改的字段
 - 同样支持 `startAt` 和 `dueAt` 的修改与校验
+- 传 `null` 可清空对应时间字段
 
 ---
 
@@ -200,22 +202,37 @@ npm start
 
 ## ⚠️ 当前限制
 
-1. **数据持久性有限**：当前使用 JSON 文件存储，Render 免费实例在闲置/重启后会重置文件系统，任务数据可能丢失。
+1. **数据持久性有限**：当前线上数据仍保存在 Render Web Service 的运行时文件系统中，`data/tasks.json` 不适合作为长期可靠的线上数据库。Render 免费实例在闲置/重启后会重置文件系统，任务数据可能丢失。
 2. **单用户**：仅支持一个全局密码登录，无多用户和注册功能。
 3. **无数据库**：未接入真正的数据库，查询、并发、数据完整性和扩展性受限。
 4. **前端未使用框架**：所有前端逻辑基于原生 JavaScript，后期可迁移到 React / Vue 以获得更好的维护性。
 
 ---
 
+## 🔒 Git 注意事项
+
+- **不提交 `.env`**：`.gitignore` 已包含，确保本地 `.env` 不会被推送到远程仓库。
+- **不提交 `node_modules`**：已在 `.gitignore` 中忽略。
+- **不提交真实密码、`COOKIE_SECRET`、`DATABASE_URL`、API Key**：所有敏感信息应通过环境变量注入，切勿硬编码或写入仓库。
+- **不建议提交个人真实任务数据**：`data/tasks.json` 中包含个人的学习任务内容，建议提交一个空数组示例或不提交该文件，避免个人数据泄露。
+
+---
+
+## 📲 PWA 策略
+
+- **保留 manifest 和图标**：`public/manifest.webmanifest` 和图标资源已配置好的 PWA 清单，支持将应用安装到桌面。
+- **当前不注册 service worker**：为避免影响 API 调用的及时性，暂不启用 `public/service-worker.js`。
+- **不缓存任何 `/api/*` 请求**：所有 API 请求直接到服务端，不经过 Cache Storage，确保任务数据始终为最新。
+
+---
+
 ## 🔮 后续计划
 
-- **迁移到 PostgreSQL**：使用 `DATABASE_URL` 环境变量接入 PostgreSQL，确保线上数据持久可恢复
-- 接入 AI 辅助学习规划（如根据考试日期自动生成复习任务）
-- 学习数据统计图表（每日/每周完成量、分类分布、时间热力图）
-- 任务提醒通知（浏览器通知或邮件）
-- 多用户支持（注册 / 登录 / 数据隔离）
-- 迁移前端到现代框架（React / Vue）
-- 单元测试与 CI/CD 流程
+- **PostgreSQL 数据库存储**：迁移到 Neon PostgreSQL，解决 `data/tasks.json` 文件存储的持久性与可靠性问题。
+- **UI 优化**：完善移动端、无障碍和交互动效。
+- **任务排序 / 按时间排序**：支持按创建时间、优先级、截止时间等维度排序。
+- **考试倒计时 / 提醒**：基于 `dueAt` 提供倒计时显示，在截止前发送浏览器通知。
+- **DeepSeek AI 自动生成任务**：接入 AI 辅助学习规划，根据考试日期自动生成复习任务。
 
 ---
 
