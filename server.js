@@ -9,6 +9,7 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
+const db = require("./db");
 
 // ==================== 启动前校验 ====================
 
@@ -434,9 +435,20 @@ app.delete("/api/tasks/:id", requireAuth, function (req, res) {
 
 // ==================== 启动服务 ====================
 
-app.listen(PORT, function () {
-    console.log("✅ StudyMate 服务已启动 → http://localhost:" + PORT);
-    console.log("📁 静态文件目录: " + path.join(__dirname, "public"));
-    console.log("💾 数据存储文件: " + DATA_FILE);
-    console.log("🔐 密码登录保护已启用");
+db.initDb().then(function () {
+    app.listen(PORT, function () {
+        console.log("✅ StudyMate 服务已启动 → http://localhost:" + PORT);
+        console.log("📁 静态文件目录: " + path.join(__dirname, "public"));
+        console.log("💾 数据存储文件: " + DATA_FILE);
+        console.log("🔐 密码登录保护已启用");
+    });
+}).catch(function (err) {
+    console.error("❌ 数据库初始化异常:", err.message);
+    // 即使数据库初始化失败，依然启动服务（使用 JSON 文件）
+    app.listen(PORT, function () {
+        console.log("✅ StudyMate 服务已启动 → http://localhost:" + PORT);
+        console.log("📁 静态文件目录: " + path.join(__dirname, "public"));
+        console.log("💾 数据存储文件: " + DATA_FILE);
+        console.log("🔐 密码登录保护已启用");
+    });
 });
