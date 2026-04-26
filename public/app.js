@@ -12,6 +12,10 @@
 async function loadTasks() {
     try {
         const res = await fetch("/api/tasks");
+        if (res.status === 401) {
+            window.location.href = "/login";
+            return [];
+        }
         if (!res.ok) {
             throw new Error("获取任务失败：HTTP " + res.status);
         }
@@ -28,12 +32,17 @@ async function loadTasks() {
 
 /**
  * 统一 fetch 封装，自动处理 JSON 响应和错误
+ * 当 API 返回 401 时自动跳转到登录页
  * @param {string} url
  * @param {Object} options
  * @returns {Promise<Object>}
  */
 async function apiFetch(url, options) {
     const res = await fetch(url, options);
+    if (res.status === 401) {
+        window.location.href = "/login";
+        throw new Error("未登录");
+    }
     const json = await res.json();
     if (!json.success && !res.ok) {
         throw new Error(json.error || "请求失败");
