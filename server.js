@@ -153,6 +153,28 @@ function generateId() {
 }
 
 /**
+ * 标准化并验证日期字段（startAt / dueAt）
+ * @param {any} value - 请求中传入的值
+ * @returns {{ value: string|null, error: string|null }}
+ */
+function normalizeDateField(value) {
+    // 空字符串、null 或 undefined → 保存为 null
+    if (value === null || value === undefined || value === "") {
+        return { value: null, error: null };
+    }
+    // 不是字符串则视为非法
+    if (typeof value !== "string") {
+        return { value: null, error: "invalid date" };
+    }
+    // 校验是否为合法日期
+    const date = new Date(value);
+    if (isNaN(date.getTime())) {
+        return { value: null, error: "invalid date" };
+    }
+    return { value: date.toISOString(), error: null };
+}
+
+/**
  * 读取任务数据
  * @returns {Array} 任务对象数组
  */
@@ -251,7 +273,21 @@ app.get("/api/me", function (req, res) {
  */
 app.get("/api/tasks", requireAuth, function (req, res) {
     const tasks = readTasks();
-    res.json({ success: true, data: tasks });
+    // 标准化旧任务：没有 startAt/dueAt 的返回 null
+    const normalized = tasks.map(function (t) {
+        return {
+            id: t.id,
+            text: t.text,
+            priority: t.priority || "medium",
+            category: t.category || "其他",
+            completed: t.completed || false,
+            startAt: t.startAt !== undefined ? t.startAt : null,
+            dueAt: t.dueAt !== undefined ? t.dueAt : null,
+            createdAt: t.createdAt || null,
+            updatedAt: t.updatedAt || null,
+        };
+    });
+    res.json({ success: true, data: normalized });
 });
 
 /**
@@ -260,12 +296,29 @@ app.get("/api/tasks", requireAuth, function (req, res) {
  * 请求体: { text, priority, category }
  */
 app.post("/api/tasks", requireAuth, function (req, res) {
-    const { text, title, priority, category } = req.body;
+    const { text, title, priority, category, startAt, dueAt } = req.body;
     const taskText = text || title;
 
     // 校验必填字段
     if (!taskText || !taskText.trim()) {
         return res.status(400).json({ success: false, error: "任务内容不能为空" });
+    }
+
+    // 标准化并验证 startAt
+    const startResult = normalizeDateField(startAt);
+    if (startResult.error) {
+        return res.status(400).json({ success: false, error: "Invalid startAt" });
+    }
+
+    // 标准化并验证 dueAt
+    const dueResult = normalizeDateField(dueAt);
+    if (dueResult.error) {
+        return res.status(400).json({ success: false, error: "Invalid dueAt" });
+    }
+
+    // 如果两者都存在且 startAt 晚于 dueAt，返回 400
+    if (startResult.value && dueResult.value && startResult.value > dueResult.value) {
+        return res.status(400).json({ success: false, error: "startAt cannot be later than dueAt" });
     }
 
     const now = new Date().toISOString();
@@ -275,6 +328,8 @@ app.post("/api/tasks", requireAuth, function (req, res) {
         priority: priority || "medium",
         category: category || "其他",
         completed: false,
+        startAt: startResult.value,
+        dueAt: dueResult.value,
         createdAt: now,
         updatedAt: now,
     };
@@ -294,6 +349,7 @@ app.post("/api/tasks", requireAuth, function (req, res) {
 app.patch("/api/tasks/:id", requireAuth, function (req, res) {
     const { id } = req.params;
     const allowedFields = ["text", "priority", "category", "completed"];
+    const dateFields = ["startAt", "dueAt"];
 
     const tasks = readTasks();
     const index = tasks.findIndex(function (t) { return t.id === id; });
@@ -302,12 +358,31 @@ app.patch("/api/tasks/:id", requireAuth, function (req, res) {
         return res.status(404).json({ success: false, error: "任务不存在" });
     }
 
-    // 只更新传入的字段
+    // 只更新传入的常规字段
     allowedFields.forEach(function (field) {
         if (req.body[field] !== undefined) {
             tasks[index][field] = req.body[field];
         }
     });
+
+    // 处理日期字段 (startAt, dueAt)
+    for (var di = 0; di < dateFields.length; di++) {
+        var field = dateFields[di];
+        if (req.body[field] !== undefined) {
+            var result = normalizeDateField(req.body[field]);
+            if (result.error) {
+                return res.status(400).json({ success: false, error: "Invalid " + field });
+            }
+            tasks[index][field] = result.value;
+        }
+    }
+
+    // startAt 和 dueAt 交叉验证：都非 null 时 startAt 不能晚于 dueAt
+    var currentStartAt = tasks[index].startAt;
+    var currentDueAt = tasks[index].dueAt;
+    if (currentStartAt && currentDueAt && currentStartAt > currentDueAt) {
+        return res.status(400).json({ success: false, error: "startAt cannot be later than dueAt" });
+    }
 
     // 如果传了 text，去掉首尾空格
     if (req.body.text !== undefined) {
