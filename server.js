@@ -176,6 +176,33 @@ function normalizeDateField(value) {
 }
 
 /**
+ * 判断是否使用数据库存储
+ * @returns {boolean}
+ */
+function useDb() {
+    return Boolean(process.env.DATABASE_URL);
+}
+
+/**
+ * 将数据库行转换为前端任务对象（下划线字段 → 驼峰字段）
+ * @param {Object} row - 数据库查询结果行
+ * @returns {Object}
+ */
+function mapRowToTask(row) {
+    return {
+        id: row.id,
+        text: row.text,
+        priority: row.priority,
+        category: row.category,
+        completed: row.completed,
+        startAt: row.start_at ? new Date(row.start_at).toISOString() : null,
+        dueAt: row.due_at ? new Date(row.due_at).toISOString() : null,
+        createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
+        updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
+    };
+}
+
+/**
  * 读取任务数据
  * @returns {Array} 任务对象数组
  */
@@ -272,7 +299,19 @@ app.get("/api/me", function (req, res) {
  * GET /api/tasks
  * 获取所有任务列表
  */
-app.get("/api/tasks", requireAuth, function (req, res) {
+app.get("/api/tasks", requireAuth, async function (req, res) {
+    // PostgreSQL 路径
+    if (useDb()) {
+        try {
+            const result = await db.query("SELECT * FROM tasks ORDER BY created_at DESC");
+            const tasks = result.rows.map(mapRowToTask);
+            return res.json({ success: true, data: tasks });
+        } catch (err) {
+            console.error("数据库查询失败:", err.message);
+            return res.status(500).json({ success: false, error: "服务器错误" });
+        }
+    }
+    // JSON 文件回退路径
     const tasks = readTasks();
     // 标准化旧任务：没有 startAt/dueAt 的返回 null
     const normalized = tasks.map(function (t) {
@@ -296,7 +335,7 @@ app.get("/api/tasks", requireAuth, function (req, res) {
  * 新增一个任务
  * 请求体: { text, priority, category }
  */
-app.post("/api/tasks", requireAuth, function (req, res) {
+app.post("/api/tasks", requireAuth, async function (req, res) {
     const { text, title, priority, category, startAt, dueAt } = req.body;
     const taskText = text || title;
 
@@ -323,8 +362,36 @@ app.post("/api/tasks", requireAuth, function (req, res) {
     }
 
     const now = new Date().toISOString();
+    const taskId = generateId();
+
+    // PostgreSQL 路径
+    if (useDb()) {
+        try {
+            const result = await db.query(
+                `INSERT INTO tasks (id, text, priority, category, completed, start_at, due_at, created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, false, $5, $6, $7, $7)
+                 RETURNING *`,
+                [
+                    taskId,
+                    taskText.trim(),
+                    priority || "medium",
+                    category || "默认",
+                    startResult.value,
+                    dueResult.value,
+                    now,
+                ]
+            );
+            const task = mapRowToTask(result.rows[0]);
+            return res.status(201).json({ success: true, data: task });
+        } catch (err) {
+            console.error("数据库写入失败:", err.message);
+            return res.status(500).json({ success: false, error: "服务器错误" });
+        }
+    }
+
+    // JSON 文件回退路径
     const newTask = {
-        id: generateId(),
+        id: taskId,
         text: taskText.trim(),
         priority: priority || "medium",
         category: category || "其他",
@@ -347,8 +414,97 @@ app.post("/api/tasks", requireAuth, function (req, res) {
  * 修改任务（只更新请求体中传入的字段）
  * 请求体可包含: { text, priority, category, completed }
  */
-app.patch("/api/tasks/:id", requireAuth, function (req, res) {
+app.patch("/api/tasks/:id", requireAuth, async function (req, res) {
     const { id } = req.params;
+
+    // PostgreSQL 路径
+    if (useDb()) {
+        try {
+            // 先检查任务是否存在
+            const existing = await db.query("SELECT * FROM tasks WHERE id = $1", [id]);
+            if (existing.rows.length === 0) {
+                return res.status(404).json({ success: false, error: "任务不存在" });
+            }
+            const current = existing.rows[0];
+
+            // 构建动态 UPDATE
+            const updates = [];
+            const params = [];
+            var paramIdx = 1;
+
+            if (req.body.text !== undefined) {
+                var trimmed = req.body.text.trim();
+                if (!trimmed) {
+                    return res.status(400).json({ success: false, error: "任务内容不能为空" });
+                }
+                updates.push("text = $" + paramIdx++);
+                params.push(trimmed);
+            }
+            if (req.body.priority !== undefined) {
+                updates.push("priority = $" + paramIdx++);
+                params.push(req.body.priority);
+            }
+            if (req.body.category !== undefined) {
+                updates.push("category = $" + paramIdx++);
+                params.push(req.body.category);
+            }
+            if (req.body.completed !== undefined) {
+                updates.push("completed = $" + paramIdx++);
+                params.push(req.body.completed);
+            }
+            if (req.body.startAt !== undefined) {
+                var startFieldResult = normalizeDateField(req.body.startAt);
+                if (startFieldResult.error) {
+                    return res.status(400).json({ success: false, error: "Invalid startAt" });
+                }
+                updates.push("start_at = $" + paramIdx++);
+                params.push(startFieldResult.value);
+            }
+            if (req.body.dueAt !== undefined) {
+                var dueFieldResult = normalizeDateField(req.body.dueAt);
+                if (dueFieldResult.error) {
+                    return res.status(400).json({ success: false, error: "Invalid dueAt" });
+                }
+                updates.push("due_at = $" + paramIdx++);
+                params.push(dueFieldResult.value);
+            }
+
+            if (updates.length === 0) {
+                // 没有要更新的字段，直接返回当前数据
+                return res.json({ success: true, data: mapRowToTask(current) });
+            }
+
+            // 更新 updated_at
+            updates.push("updated_at = $" + paramIdx++);
+            params.push(new Date().toISOString());
+
+            // 交叉验证 start_at 和 due_at
+            var finalStartAt = req.body.startAt !== undefined
+                ? normalizeDateField(req.body.startAt).value
+                : (current.start_at ? new Date(current.start_at).toISOString() : null);
+            var finalDueAt = req.body.dueAt !== undefined
+                ? normalizeDateField(req.body.dueAt).value
+                : (current.due_at ? new Date(current.due_at).toISOString() : null);
+
+            if (finalStartAt && finalDueAt && finalStartAt > finalDueAt) {
+                return res.status(400).json({ success: false, error: "startAt cannot be later than dueAt" });
+            }
+
+            // 执行更新
+            params.push(id);
+            var updateResult = await db.query(
+                "UPDATE tasks SET " + updates.join(", ") + " WHERE id = $" + paramIdx + " RETURNING *",
+                params
+            );
+
+            return res.json({ success: true, data: mapRowToTask(updateResult.rows[0]) });
+        } catch (err) {
+            console.error("数据库更新失败:", err.message);
+            return res.status(500).json({ success: false, error: "服务器错误" });
+        }
+    }
+
+    // JSON 文件回退路径
     const allowedFields = ["text", "priority", "category", "completed"];
     const dateFields = ["startAt", "dueAt"];
 
@@ -400,7 +556,22 @@ app.patch("/api/tasks/:id", requireAuth, function (req, res) {
  * DELETE /api/tasks/completed
  * 清空所有已完成任务（必须在 :id 路由之前注册）
  */
-app.delete("/api/tasks/completed", requireAuth, function (req, res) {
+app.delete("/api/tasks/completed", requireAuth, async function (req, res) {
+    // PostgreSQL 路径
+    if (useDb()) {
+        try {
+            var delResult = await db.query("DELETE FROM tasks WHERE completed = true RETURNING id");
+            var delCount = delResult.rows.length;
+            if (delCount === 0) {
+                return res.json({ success: true, data: { deleted: 0, message: "没有已完成的任务" } });
+            }
+            return res.json({ success: true, data: { deleted: delCount, message: "已删除 " + delCount + " 个已完成任务" } });
+        } catch (err) {
+            console.error("数据库删除失败:", err.message);
+            return res.status(500).json({ success: false, error: "服务器错误" });
+        }
+    }
+    // JSON 文件回退路径
     const tasks = readTasks();
     const remaining = tasks.filter(function (t) { return !t.completed; });
     const deletedCount = tasks.length - remaining.length;
@@ -418,8 +589,24 @@ app.delete("/api/tasks/completed", requireAuth, function (req, res) {
  * DELETE /api/tasks/:id
  * 删除指定 id 的任务
  */
-app.delete("/api/tasks/:id", requireAuth, function (req, res) {
+app.delete("/api/tasks/:id", requireAuth, async function (req, res) {
     const { id } = req.params;
+
+    // PostgreSQL 路径
+    if (useDb()) {
+        try {
+            var delByIdResult = await db.query("DELETE FROM tasks WHERE id = $1 RETURNING *", [id]);
+            if (delByIdResult.rows.length === 0) {
+                return res.status(404).json({ success: false, error: "任务不存在" });
+            }
+            return res.json({ success: true, data: mapRowToTask(delByIdResult.rows[0]) });
+        } catch (err) {
+            console.error("数据库删除失败:", err.message);
+            return res.status(500).json({ success: false, error: "服务器错误" });
+        }
+    }
+
+    // JSON 文件回退路径
     const tasks = readTasks();
     const index = tasks.findIndex(function (t) { return t.id === id; });
 
