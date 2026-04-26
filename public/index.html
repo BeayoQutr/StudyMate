@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudyMate - 个人学习任务看板</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- ==================== 顶部导航栏 ==================== -->
+    <header class="header">
+        <div class="header-inner">
+            <h1 class="logo">
+                <span class="logo-icon">🎓</span>
+                StudyMate
+                <span class="logo-subtitle">个人学习任务看板</span>
+            </h1>
+        </div>
+    </header>
+
+    <!-- ==================== 主内容区 ==================== -->
+    <main class="container">
+
+        <!-- 统计卡片区 -->
+        <section class="stats-row">
+            <div class="stat-card">
+                <div class="stat-icon">📋</div>
+                <div class="stat-info">
+                    <span class="stat-number" id="statTotal">0</span>
+                    <span class="stat-label">总任务</span>
+                </div>
+            </div>
+            <div class="stat-card stat-card--done">
+                <div class="stat-icon">✅</div>
+                <div class="stat-info">
+                    <span class="stat-number" id="statDone">0</span>
+                    <span class="stat-label">已完成</span>
+                </div>
+            </div>
+            <div class="stat-card stat-card--rate">
+                <div class="stat-icon">📈</div>
+                <div class="stat-info">
+                    <span class="stat-number" id="statRate">0%</span>
+                    <span class="stat-label">完成率</span>
+                    <div class="stat-mini-bar">
+                        <div class="stat-mini-bar-fill" id="statMiniBar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 添加任务区 -->
+        <section class="add-task-area">
+            <input
+                type="text"
+                id="taskInput"
+                class="task-input"
+                placeholder="✍️ 输入新的学习任务..."
+                maxlength="60"
+                autocomplete="off"
+            >
+            <select id="prioritySelect" class="form-select">
+                <option value="low">🟢 低优先级</option>
+                <option value="medium" selected>🟡 中优先级</option>
+                <option value="high">🔴 高优先级</option>
+            </select>
+            <select id="categorySelect" class="form-select">
+                <option value="学习">📚 学习</option>
+                <option value="作业">📝 作业</option>
+                <option value="考试">📖 考试</option>
+                <option value="项目">💻 项目</option>
+                <option value="其他">📌 其他</option>
+            </select>
+            <button id="addBtn" class="btn btn-primary">➕ 添加任务</button>
+        </section>
+
+        <!-- 筛选 & 批量操作区 -->
+        <section class="toolbar">
+            <div class="toolbar-left">
+                <label class="filter-label">筛选：</label>
+                <select id="filterPriority" class="form-select form-select--sm">
+                    <option value="all">全部优先级</option>
+                    <option value="high">🔴 高</option>
+                    <option value="medium">🟡 中</option>
+                    <option value="low">🟢 低</option>
+                </select>
+                <select id="filterCategory" class="form-select form-select--sm">
+                    <option value="all">全部分类</option>
+                    <option value="学习">📚 学习</option>
+                    <option value="作业">📝 作业</option>
+                    <option value="考试">📖 考试</option>
+                    <option value="项目">💻 项目</option>
+                    <option value="其他">📌 其他</option>
+                </select>
+            </div>
+            <div class="toolbar-right">
+                <button id="clearDoneBtn" class="btn btn-danger">🗑 清空已完成任务</button>
+            </div>
+        </section>
+
+        <!-- 任务列表区 -->
+        <section class="task-list-area">
+            <!-- 空状态提示 -->
+            <div id="emptyState" class="empty-state">
+                <div class="empty-illustration">
+                    <span class="empty-icon">📭</span>
+                </div>
+                <p class="empty-title">还没有任务</p>
+                <p class="empty-desc">在上方添加你的第一个学习任务吧！</p>
+            </div>
+            <!-- 任务列表容器 -->
+            <ul id="taskList" class="task-list"></ul>
+        </section>
+
+    </main>
+
+    <!-- ==================== 底部 ==================== -->
+    <footer class="footer">
+        <p>Made with ❤️ by <strong>岁年</strong> &nbsp;|&nbsp; StudyMate © 2026</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
