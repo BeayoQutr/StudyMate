@@ -284,6 +284,27 @@ body {
     font-size: 13px;
 }
 
+/* datetime-local 输入框 */
+.datetime-input {
+    padding: 13px 14px;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-family: var(--font-family);
+    color: var(--color-text);
+    background: #fafbfd;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    min-width: 190px;
+    flex-shrink: 0;
+    outline: none;
+}
+
+.datetime-input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 4px var(--color-primary-glow);
+    background: #fff;
+}
+
 /* ==================== 按钮 ==================== */
 .btn {
     padding: 13px 22px;
@@ -428,6 +449,7 @@ body {
     transition: all 0.2s;
     animation: fadeIn 0.35s ease;
     position: relative;
+    flex-wrap: wrap;
 }
 
 /* 左侧优先级色条 */
@@ -566,6 +588,53 @@ body {
     transform: scale(1.1);
 }
 
+/* ==================== 任务时间信息 ==================== */
+.task-dates {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-left: 36px;
+    font-size: 12px;
+    color: var(--color-text-light);
+    margin-top: 2px;
+}
+
+.task-date {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.date-hint-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.date-hint-badge.date-hint-overdue {
+    background: #fef0ef;
+    color: var(--color-high);
+}
+
+.date-hint-badge.date-hint-future {
+    background: #eef0ff;
+    color: var(--color-primary);
+}
+
+.task-date.date-hint-overdue {
+    color: var(--color-high);
+    font-weight: 500;
+}
+
+.task-date.date-hint-future {
+    color: var(--color-primary);
+    font-weight: 500;
+}
+
 /* ==================== 底部 ==================== */
 .footer {
     text-align: center;
@@ -656,6 +725,11 @@ body {
         width: 100%;
     }
 
+    .datetime-input {
+        width: 100%;
+        min-width: 100%;
+    }
+
     .btn {
         width: 100%;
         text-align: center;
@@ -727,5 +801,12 @@ body {
 
     .empty-title {
         font-size: 18px;
+    }
+
+    /* 任务日期信息在手机上缩小 */
+    .task-dates {
+        padding-left: 30px;
+        font-size: 11px;
+        gap: 8px;
     }
 }

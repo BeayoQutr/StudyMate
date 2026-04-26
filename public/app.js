@@ -58,6 +58,8 @@ let tasks = [];
 const taskInput = document.getElementById("taskInput");
 const prioritySelect = document.getElementById("prioritySelect");
 const categorySelect = document.getElementById("categorySelect");
+const startAtInput = document.getElementById("startAtInput");
+const dueAtInput = document.getElementById("dueAtInput");
 const addBtn = document.getElementById("addBtn");
 
 const filterPriority = document.getElementById("filterPriority");
@@ -73,6 +75,37 @@ const statRate = document.getElementById("statRate");
 const statMiniBar = document.getElementById("statMiniBar");
 
 // ==================== 核心函数 ====================
+
+/**
+ * 将 datetime-local 输入值转换为 ISO 字符串
+ * @param {string} value - datetime-local input value (e.g. "2026-05-12T13:00")
+ * @returns {string|null} ISO 字符串或 null
+ */
+function datetimeLocalToISO(value) {
+    if (!value) return null;
+    // datetime-local 的 value 格式为 "YYYY-MM-DDTHH:mm" 或 "YYYY-MM-DDTHH:mm:ss"
+    // 浏览器默认不带时区，视为本地时间
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return null;
+    return date.toISOString();
+}
+
+/**
+ * 将 ISO 日期字符串格式化为本地时间显示
+ * @param {string|null} isoStr
+ * @returns {string|null} 例如 "2026/5/12 13:00"
+ */
+function formatDateForDisplay(isoStr) {
+    if (!isoStr) return null;
+    const date = new Date(isoStr);
+    if (isNaN(date.getTime())) return null;
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return year + "/" + month + "/" + day + " " + hours + ":" + minutes;
+}
 
 /**
  * 添加任务（调用 POST /api/tasks）
@@ -93,11 +126,28 @@ async function addTask() {
     const priority = prioritySelect.value;
     const category = categorySelect.value;
 
+    // 读取日期值
+    const startAtRaw = startAtInput.value;
+    const dueAtRaw = dueAtInput.value;
+    const startAtISO = datetimeLocalToISO(startAtRaw);
+    const dueAtISO = datetimeLocalToISO(dueAtRaw);
+
+    // 前端校验：startAt 不能晚于 dueAt
+    if (startAtISO && dueAtISO && startAtISO > dueAtISO) {
+        alert("开始时间不能晚于截止时间");
+        return;
+    }
+
+    // 构建请求体
+    const body = { text: text, priority: priority, category: category };
+    if (startAtISO) body.startAt = startAtISO;
+    if (dueAtISO) body.dueAt = dueAtISO;
+
     try {
         const json = await apiFetch("/api/tasks", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: text, priority: priority, category: category }),
+            body: JSON.stringify(body),
         });
         // 后端返回新任务，插入到数组最前面
         tasks.unshift(json.data);
@@ -109,6 +159,8 @@ async function addTask() {
 
     // 清空输入框
     taskInput.value = "";
+    startAtInput.value = "";
+    dueAtInput.value = "";
     taskInput.focus();
 
     // 刷新界面
@@ -271,6 +323,49 @@ function getPriorityInfo(priority) {
 }
 
 /**
+ * 生成任务的时间信息 HTML 片段
+ * @param {Object} task
+ * @returns {string}
+ */
+function buildDateInfoHtml(task) {
+    var now = new Date();
+    var parts = [];
+    var startDisplay = formatDateForDisplay(task.startAt);
+    var dueDisplay = formatDateForDisplay(task.dueAt);
+
+    if (startDisplay) {
+        var cls = "";
+        // 未开始提示：startAt 在未来且未完成
+        if (!task.completed && task.startAt && new Date(task.startAt) > now) {
+            cls = ' class="date-hint-future"';
+        }
+        parts.push('<span class="task-date"' + cls + '>开始：' + escapeHtml(startDisplay) + "");
+        if (!task.completed && task.startAt && new Date(task.startAt) > now) {
+            parts.push(' <span class="date-hint-badge date-hint-future">未开始</span>');
+        }
+        parts.push("</span>");
+    }
+
+    if (dueDisplay) {
+        var cls2 = "";
+        // 已过期提示：dueAt 已过且未完成
+        if (!task.completed && task.dueAt && new Date(task.dueAt) < now) {
+            cls2 = ' class="date-hint-overdue"';
+        }
+        parts.push('<span class="task-date"' + cls2 + '>截止：' + escapeHtml(dueDisplay) + "");
+        if (!task.completed && task.dueAt && new Date(task.dueAt) < now) {
+            parts.push(' <span class="date-hint-badge date-hint-overdue">已过期</span>');
+        }
+        parts.push("</span>");
+    }
+
+    if (parts.length > 0) {
+        return '<div class="task-dates">' + parts.join("") + "</div>";
+    }
+    return "";
+}
+
+/**
  * 渲染任务列表
  */
 function renderTaskList() {
@@ -334,7 +429,8 @@ function renderTaskList() {
             "</span>" +
             '<button class="task-delete" data-id="' +
             task.id +
-            '" title="删除任务">✕</button>';
+            '" title="删除任务">✕</button>' +
+            buildDateInfoHtml(task);
 
         // 绑定复选框事件
         var checkbox = li.querySelector(".task-checkbox");
