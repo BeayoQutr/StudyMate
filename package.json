@@ -1,7 +1,7 @@
 {
   "name": "studymate",
   "version": "1.0.0",
-  "description": "一个简洁美观、纯前端的学习任务管理工具，适合学生日常使用和课程作品展示。",
+  "description": "一个简洁美观的学习任务管理工具，适合学生日常使用和课程作品展示。",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
